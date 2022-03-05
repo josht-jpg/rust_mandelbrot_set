@@ -1,51 +1,20 @@
-//use num::complex::Complex;
-#[derive(Debug, PartialEq, Clone, Copy)]
-struct Complex {
-    pub real: f64,
-    pub img: f64,
-}
+use complex_numbers::{add, magnitude, mult, Complex};
+use plotters::prelude::*;
 
-impl Complex {
-    pub fn magnitude(&self) -> f64 {
-        (self.real.powi(2) + self.img.powi(2)).sqrt()
-    }
-}
-
-fn complex_add(z1: &Complex, z2: &Complex) -> Complex {
-    Complex {
-        real: z1.real + z2.real,
-        img: z1.img + z2.img,
-    }
-}
-
-fn complex_mult(z1: &Complex, z2: &Complex) -> Complex {
-    Complex {
-        real: z1.real * z2.real - z1.img * z2.img,
-        img: z1.real * z2.img + z1.img * z2.real,
-    }
-}
-
-fn mandelbrot(z: Complex, n: u32) -> u32 {
+fn mandelbrot(z: &Complex, num_iterations: u32) -> u32 {
     let mut diverge_count: u32 = 0;
 
-    let mut z1 = z;
-    while diverge_count <= n {
-        println!("{}", z1.magnitude());
-
-        if z1.magnitude() > 2. {
+    let mut z1 = *z;
+    while diverge_count <= num_iterations {
+        if magnitude(&z1) > 2. {
             return diverge_count;
         }
 
-        z1 = complex_add(&complex_mult(&z1, &z1), &z);
+        z1 = add(&mult(&z1, &z1), &z);
         diverge_count += 1;
     }
-
-    // if z hasn't deiverged by the end
-    return n;
+    num_iterations
 }
-
-use plotters::prelude::*;
-use std::ops::Range;
 
 const OUT_FILE_NAME: &'static str = "mandelbrot.png";
 fn draw_mandelbrot() -> Result<(), Box<dyn std::error::Error>> {
@@ -80,20 +49,25 @@ fn draw_mandelbrot() -> Result<(), Box<dyn std::error::Error>> {
     const NUM_CONVERGE: u32 = 100;
 
     for k in 0..(samples.0 * samples.1) {
-        let z = Complex {
-            real: real.start + step.0 * (k % samples.0) as f64,
-            img: complex.start + step.1 * (k / samples.0) as f64,
-        };
-        let count = mandelbrot(z, NUM_CONVERGE);
+        let z = Complex(
+            real.start + step.0 * (k % samples.0) as f64,
+            complex.start + step.1 * (k / samples.0) as f64,
+        );
 
-        if count != NUM_CONVERGE {
-            plotting_area.draw_pixel((z.real, z.img), &HSLColor(count as f64 / 100.0, 1.0, 0.5))?;
+        let iterations_till_divergence = mandelbrot(&z, NUM_CONVERGE);
+
+        let Complex(a, b) = z;
+
+        if iterations_till_divergence != NUM_CONVERGE {
+            plotting_area.draw_pixel(
+                (a, b),
+                &HSLColor(iterations_till_divergence as f64 / 100.0, 1.0, 0.5),
+            )?;
         } else {
-            plotting_area.draw_pixel((z.real, z.img), &BLACK)?;
+            plotting_area.draw_pixel((a, b), &BLACK)?;
         }
     }
 
-    // To avoid the IO failure being ignored silently, we manually call the present function
     root.present().expect("Unable to write result to file, please make sure 'plotters-doc-data' dir exists under current dir");
     println!("Result has been saved to {}", OUT_FILE_NAME);
 
@@ -105,41 +79,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn add_test() {
-        let z1 = Complex {
-            real: -2.5,
-            img: 4.,
-        };
-        let z2 = Complex {
-            real: 5.5,
-            img: 1.5,
-        };
-        assert_eq!(complex_add(&z1, &z2), Complex { real: 3., img: 5.5 });
-    }
-
-    fn mult_test() {
-        let z1 = Complex { real: -2., img: 4. };
-        let z2 = Complex {
-            real: 2.5,
-            img: 0.5,
-        };
-        assert_eq!(complex_mult(&z1, &z2), Complex { real: -7., img: 9. });
-    }
-
-    fn magnitude_test() {
-        let z = Complex { real: -3., img: 4. };
-        assert_eq!(z.magnitude(), 5.);
-    }
-
-    #[test]
     fn mandelbrot_test() {
-        let z = Complex {
-            real: 0.25,
-            img: 0.75,
-        };
-        let count = mandelbrot(z, 20);
-        println!("{}", count);
-        assert!(true);
+        const NUM_ITERATIONS: u32 = 20;
+
+        // Not in the mandelbrot set
+        let z1 = Complex(0.25, 0.75);
+        assert_ne!(mandelbrot(&z1, NUM_ITERATIONS), NUM_ITERATIONS);
+
+        let z2 = Complex(-1., 0.5);
+        assert_ne!(mandelbrot(&z2, NUM_ITERATIONS), NUM_ITERATIONS);
+
+        // In the mandelbrot set
+        let z3 = Complex(0., 0.);
+        assert_eq!(mandelbrot(&z3, NUM_ITERATIONS), NUM_ITERATIONS);
+
+        let z4 = Complex(1. / 8., -1. / 8.);
+        assert_eq!(mandelbrot(&z4, NUM_ITERATIONS), NUM_ITERATIONS);
     }
 
     #[test]
