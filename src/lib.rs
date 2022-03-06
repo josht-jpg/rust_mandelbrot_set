@@ -4,7 +4,7 @@ use plotters::prelude::*;
 fn mandelbrot(z: &Complex, num_iterations: u32) -> u32 {
     let mut diverge_count: u32 = 0;
 
-    let mut z1 = *z;
+    let mut z1 = Complex(0., 0.);
     while diverge_count <= num_iterations {
         if magnitude(&z1) > 2. {
             return diverge_count;
